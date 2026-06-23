@@ -1,4 +1,4 @@
-﻿namespace Shared.Infrastructure.Services;
+namespace Shared.Infrastructure.Services;
 
 public interface IGuidService
 {

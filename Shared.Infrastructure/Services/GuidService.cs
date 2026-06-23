@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace Shared.Infrastructure.Services;
 
-namespace Shared.Infrastructure.Services
+public class GuidService : IGuidService
 {
-    internal class GuidService
-    {
-    }
+    public string NewGuid() => Guid.NewGuid().ToString();
 }

@@ -1,4 +1,4 @@
-﻿namespace Module.Auth.Core.DTOs;
+namespace Module.Auth.Core.DTOs;
 
 public class SendOtpRequestDto
 {

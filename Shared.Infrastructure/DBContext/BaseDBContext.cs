@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Shared.Infrastructure.Models;
 using System.Data;
@@ -56,6 +56,7 @@ public abstract class BaseDBContext
         await using var reader = await cmd.ExecuteReaderAsync();
         return await reader.ReadAsync() ? mapper(reader) : null;
     }
+
     protected async Task ExecuteAsync(
         string storedProc,
         SqlParameter[]? parameters = null)

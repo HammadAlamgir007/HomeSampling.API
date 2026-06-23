@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Module.Auth.Core.DBOs;
 using Module.Auth.Core.DTOs;
@@ -25,9 +25,9 @@ public class AuthService : IAuthService
         IGuidService guid,
         IConfiguration config)
     {
-        _db = db;
-        _email = email;
-        _guid = guid;
+        _db     = db;
+        _email  = email;
+        _guid   = guid;
         _config = config;
     }
 
@@ -101,10 +101,10 @@ public class AuthService : IAuthService
 
         var result = new TokenResponseDto
         {
-            Token = token,
+            Token    = token,
             Username = user.Username,
-            Email = user.Email,
-            Role = user.Role
+            Email    = user.Email,
+            Role     = user.Role
         };
         return result.ToSuccessResponse(traceId, "Login successful.");
     }
@@ -151,7 +151,7 @@ public class AuthService : IAuthService
 
     private string GenerateJwtToken(UserDbo user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+        var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new[]
         {
@@ -161,10 +161,10 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.Role,           user.Role)
         };
         var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(12),
+            issuer:            _config["Jwt:Issuer"],
+            audience:          _config["Jwt:Audience"],
+            claims:            claims,
+            expires:           DateTime.UtcNow.AddHours(12),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

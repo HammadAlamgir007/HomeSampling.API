@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Module.Auth.Core.DBOs;
 using Shared.Infrastructure.DBContext;
@@ -25,12 +25,12 @@ public class AuthDBContext : BaseDBContext, IAuthDBContext
             ],
             r => new OtpDbo
             {
-                OtpId = r.GetInt32(r.GetOrdinal("OtpId")),
-                Email = r.GetString(r.GetOrdinal("Email")),
-                Code = r.GetString(r.GetOrdinal("Code")),
-                Purpose = r.GetString(r.GetOrdinal("Purpose")),
+                OtpId     = r.GetInt32(r.GetOrdinal("OtpId")),
+                Email     = r.GetString(r.GetOrdinal("Email")),
+                Code      = r.GetString(r.GetOrdinal("Code")),
+                Purpose   = r.GetString(r.GetOrdinal("Purpose")),
                 ExpiresAt = r.GetDateTime(r.GetOrdinal("ExpiresAt")),
-                IsUsed = r.GetBoolean(r.GetOrdinal("IsUsed")),
+                IsUsed    = r.GetBoolean(r.GetOrdinal("IsUsed")),
                 CreatedAt = r.GetDateTime(r.GetOrdinal("CreatedAt"))
             });
 
@@ -77,13 +77,13 @@ public class AuthDBContext : BaseDBContext, IAuthDBContext
 
     private static UserDbo MapUser(SqlDataReader r) => new()
     {
-        UserId = r.GetInt32(r.GetOrdinal("UserId")),
-        Username = r.GetString(r.GetOrdinal("Username")),
-        Email = r.GetString(r.GetOrdinal("Email")),
-        PasswordHash = r.GetString(r.GetOrdinal("PasswordHash")),
-        Role = r.GetString(r.GetOrdinal("Role")),
-        IsLocked = r.GetBoolean(r.GetOrdinal("IsLocked")),
+        UserId        = r.GetInt32(r.GetOrdinal("UserId")),
+        Username      = r.GetString(r.GetOrdinal("Username")),
+        Email         = r.GetString(r.GetOrdinal("Email")),
+        PasswordHash  = r.GetString(r.GetOrdinal("PasswordHash")),
+        Role          = r.GetString(r.GetOrdinal("Role")),
+        IsLocked      = r.GetBoolean(r.GetOrdinal("IsLocked")),
         LoginAttempts = r.GetInt32(r.GetOrdinal("LoginAttempts")),
-        CreatedAt = r.GetDateTime(r.GetOrdinal("CreatedAt"))
+        CreatedAt     = r.GetDateTime(r.GetOrdinal("CreatedAt"))
     };
 }

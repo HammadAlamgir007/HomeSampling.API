@@ -1,0 +1,1025 @@
+-- ============================================================
+-- HomeSampling Database — Complete Setup Script
+-- Run this entire file in SQL Server Management Studio (SSMS)
+-- against your SQL Server instance
+-- ============================================================
+
+-- ─────────────────────────────────────────────
+-- 1. CREATE DATABASE
+-- ─────────────────────────────────────────────
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'HomeSamplingDB')
+BEGIN
+    CREATE DATABASE HomeSamplingDB;
+END
+GO
+
+USE HomeSamplingDB;
+GO
+
+-- ─────────────────────────────────────────────
+-- 2. CREATE TABLES
+-- ─────────────────────────────────────────────
+
+-- Users (Patients + Admins)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Users')
+BEGIN
+    CREATE TABLE Users (
+        UserId        INT           IDENTITY(1,1) PRIMARY KEY,
+        Username      NVARCHAR(100) NOT NULL,
+        Email         NVARCHAR(255) NOT NULL UNIQUE,
+        PasswordHash  NVARCHAR(500) NOT NULL,
+        Role          NVARCHAR(20)  NOT NULL DEFAULT 'Patient', -- Patient | Admin
+        IsLocked      BIT           NOT NULL DEFAULT 0,
+        LoginAttempts INT           NOT NULL DEFAULT 0,
+        CreatedAt     DATETIME2     NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- OTPs (for register and password reset)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Otps')
+BEGIN
+    CREATE TABLE Otps (
+        OtpId     INT           IDENTITY(1,1) PRIMARY KEY,
+        Email     NVARCHAR(255) NOT NULL,
+        Code      NVARCHAR(10)  NOT NULL,
+        Purpose   NVARCHAR(50)  NOT NULL, -- Register | ResetPassword
+        ExpiresAt DATETIME2     NOT NULL,
+        IsUsed    BIT           NOT NULL DEFAULT 0,
+        CreatedAt DATETIME2     NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- Tests (lab test catalog)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Tests')
+BEGIN
+    CREATE TABLE Tests (
+        TestId      INT            IDENTITY(1,1) PRIMARY KEY,
+        Name        NVARCHAR(200)  NOT NULL,
+        Description NVARCHAR(1000) NOT NULL,
+        Price       DECIMAL(10,2)  NOT NULL,
+        Duration    INT            NOT NULL, -- duration in minutes
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- Riders (field workers)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Riders')
+BEGIN
+    CREATE TABLE Riders (
+        RiderId        INT           IDENTITY(1,1) PRIMARY KEY,
+        Name           NVARCHAR(100) NOT NULL,
+        Email          NVARCHAR(255) NOT NULL UNIQUE,
+        PasswordHash   NVARCHAR(500) NOT NULL,
+        Phone          NVARCHAR(20)  NOT NULL,
+        PhotoPath      NVARCHAR(500) NULL,
+        Status         INT           NOT NULL DEFAULT 0, -- 0=Available 1=Busy 2=Offline
+        LastLatitude   FLOAT         NULL,
+        LastLongitude  FLOAT         NULL,
+        LastLocationAt DATETIME2     NULL,
+        CreatedAt      DATETIME2     NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- Appointments (central booking table)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Appointments')
+BEGIN
+    CREATE TABLE Appointments (
+        AppointmentId    INT            IDENTITY(1,1) PRIMARY KEY,
+        UserId           INT            NOT NULL FOREIGN KEY REFERENCES Users(UserId),
+        TestId           INT            NOT NULL FOREIGN KEY REFERENCES Tests(TestId),
+        RiderId          INT            NULL     FOREIGN KEY REFERENCES Riders(RiderId),
+        Status           INT            NOT NULL DEFAULT 0,
+        -- 0=Pending 1=Confirmed 2=AssignedRider 3=OnWay
+        -- 4=Arrived 5=Collected 6=Delivered 7=ReportUploaded 8=Cancelled
+        ScheduledDate    DATETIME2      NOT NULL,
+        Address          NVARCHAR(500)  NOT NULL,
+        Latitude         FLOAT          NULL,
+        Longitude        FLOAT          NULL,
+        ReportFileName   NVARCHAR(500)  NULL,
+        ReportUploadedAt DATETIME2      NULL,
+        CreatedAt        DATETIME2      NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- TaskLogs (immutable audit trail of rider actions)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TaskLogs')
+BEGIN
+    CREATE TABLE TaskLogs (
+        LogId         INT            IDENTITY(1,1) PRIMARY KEY,
+        AppointmentId INT            NOT NULL FOREIGN KEY REFERENCES Appointments(AppointmentId),
+        RiderId       INT            NOT NULL FOREIGN KEY REFERENCES Riders(RiderId),
+        Action        NVARCHAR(50)   NOT NULL, -- OnWay | Arrived | Collected | Delivered
+        Notes         NVARCHAR(1000) NULL,
+        PhotoPath     NVARCHAR(500)  NULL,
+        Latitude      FLOAT          NULL,
+        Longitude     FLOAT          NULL,
+        CreatedAt     DATETIME2      NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- Notifications (for riders and patients)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Notifications')
+BEGIN
+    CREATE TABLE Notifications (
+        NotificationId INT           IDENTITY(1,1) PRIMARY KEY,
+        RecipientId    INT           NOT NULL,  -- UserId or RiderId depending on RecipientType
+        RecipientType  NVARCHAR(10)  NOT NULL,  -- User | Rider
+        AppointmentId  INT           NULL FOREIGN KEY REFERENCES Appointments(AppointmentId),
+        Title          NVARCHAR(200) NOT NULL,
+        Body           NVARCHAR(500) NOT NULL,
+        IsRead         BIT           NOT NULL DEFAULT 0,
+        CreatedAt      DATETIME2     NOT NULL DEFAULT GETUTCDATE()
+    );
+END
+GO
+
+-- ─────────────────────────────────────────────
+-- 3. SEED DATA — default admin + sample tests
+-- ─────────────────────────────────────────────
+
+-- Default Admin user (Password: Admin@123)
+-- BCrypt hash generated for 'Admin@123'
+IF NOT EXISTS (SELECT 1 FROM Users WHERE Email = 'admin@homesampling.com')
+BEGIN
+    INSERT INTO Users (Username, Email, PasswordHash, Role)
+    VALUES (
+        'Admin',
+        'admin@homesampling.com',
+        '$2a$11$rBf3o0sLhT7Vt3Yq8wKlOeN8mZpQx1JvKdX2sA6hY9cG4nWpMuLDa',
+        'Admin'
+    );
+END
+GO
+
+-- Sample lab tests
+IF NOT EXISTS (SELECT 1 FROM Tests WHERE Name = 'Complete Blood Count (CBC)')
+BEGIN
+    INSERT INTO Tests (Name, Description, Price, Duration, IsActive) VALUES
+    ('Complete Blood Count (CBC)',
+     'Measures red blood cells, white blood cells, and platelets. Used to detect infections, anemia, and other conditions.',
+     800.00, 30, 1),
+
+    ('Blood Sugar Fasting',
+     'Measures glucose levels after fasting. Used to diagnose and monitor diabetes.',
+     400.00, 20, 1),
+
+    ('Lipid Profile',
+     'Measures cholesterol and triglycerides. Used to assess cardiovascular risk.',
+     1200.00, 30, 1),
+
+    ('Thyroid Function Test (TFT)',
+     'Measures TSH, T3, T4 levels. Used to detect thyroid disorders.',
+     1500.00, 30, 1),
+
+    ('Liver Function Test (LFT)',
+     'Measures liver enzymes and proteins. Used to detect liver disease.',
+     1200.00, 30, 1),
+
+    ('Kidney Function Test (KFT)',
+     'Measures creatinine, urea, and electrolytes. Used to assess kidney health.',
+     1100.00, 30, 1),
+
+    ('HbA1c',
+     'Measures average blood sugar over 3 months. Used for diabetes management.',
+     900.00, 20, 1),
+
+    ('Urine Complete Examination (UCE)',
+     'Analyzes urine for infections, kidney disease, and metabolic conditions.',
+     350.00, 20, 1),
+
+    ('COVID-19 PCR Test',
+     'Detects SARS-CoV-2 RNA. Gold standard for COVID-19 diagnosis.',
+     2500.00, 45, 1),
+
+    ('Hepatitis B Surface Antigen (HBsAg)',
+     'Detects Hepatitis B infection. Used for screening and diagnosis.',
+     700.00, 20, 1);
+END
+GO
+
+-- ─────────────────────────────────────────────
+-- 4. AUTH STORED PROCEDURES
+-- ─────────────────────────────────────────────
+
+-- sp_GetUserByEmail
+CREATE OR ALTER PROCEDURE sp_GetUserByEmail
+    @Email NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT UserId, Username, Email, PasswordHash,
+           Role, IsLocked, LoginAttempts, CreatedAt
+    FROM Users
+    WHERE Email = @Email;
+END
+GO
+
+-- sp_CreateUser
+CREATE OR ALTER PROCEDURE sp_CreateUser
+    @Username     NVARCHAR(100),
+    @Email        NVARCHAR(255),
+    @PasswordHash NVARCHAR(500),
+    @Role         NVARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO Users (Username, Email, PasswordHash, Role)
+    VALUES (@Username, @Email, @PasswordHash, @Role);
+END
+GO
+
+-- sp_CreateOtp
+CREATE OR ALTER PROCEDURE sp_CreateOtp
+    @Email     NVARCHAR(255),
+    @Code      NVARCHAR(10),
+    @Purpose   NVARCHAR(50),
+    @ExpiresAt DATETIME2
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO Otps (Email, Code, Purpose, ExpiresAt, IsUsed)
+    VALUES (@Email, @Code, @Purpose, @ExpiresAt, 0);
+END
+GO
+
+-- sp_GetLatestOtp
+CREATE OR ALTER PROCEDURE sp_GetLatestOtp
+    @Email   NVARCHAR(255),
+    @Purpose NVARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TOP 1 OtpId, Email, Code, Purpose, ExpiresAt, IsUsed, CreatedAt
+    FROM Otps
+    WHERE Email = @Email AND Purpose = @Purpose
+    ORDER BY CreatedAt DESC;
+END
+GO
+
+-- sp_MarkOtpUsed
+CREATE OR ALTER PROCEDURE sp_MarkOtpUsed
+    @OtpId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Otps SET IsUsed = 1 WHERE OtpId = @OtpId;
+END
+GO
+
+-- sp_UpdatePassword
+CREATE OR ALTER PROCEDURE sp_UpdatePassword
+    @Email           NVARCHAR(255),
+    @NewPasswordHash NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users
+    SET PasswordHash = @NewPasswordHash,
+        LoginAttempts = 0,
+        IsLocked = 0
+    WHERE Email = @Email;
+END
+GO
+
+-- sp_IncrementLoginAttempts
+CREATE OR ALTER PROCEDURE sp_IncrementLoginAttempts
+    @Email NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users
+    SET LoginAttempts = LoginAttempts + 1,
+        IsLocked = CASE WHEN LoginAttempts + 1 >= 5 THEN 1 ELSE 0 END
+    WHERE Email = @Email;
+END
+GO
+
+-- sp_ResetLoginAttempts
+CREATE OR ALTER PROCEDURE sp_ResetLoginAttempts
+    @Email NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users
+    SET LoginAttempts = 0,
+        IsLocked = 0
+    WHERE Email = @Email;
+END
+GO
+
+-- ─────────────────────────────────────────────
+-- 5. PATIENT STORED PROCEDURES
+-- ─────────────────────────────────────────────
+
+-- sp_GetActiveTests
+CREATE OR ALTER PROCEDURE sp_GetActiveTests
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TestId, Name, Description, Price, Duration, IsActive, CreatedAt
+    FROM Tests
+    WHERE IsActive = 1
+    ORDER BY Name;
+END
+GO
+
+-- sp_GetAppointmentByDate (duplicate check)
+CREATE OR ALTER PROCEDURE sp_GetAppointmentByDate
+    @UserId INT,
+    @TestId INT,
+    @Date   DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TOP 1
+        a.AppointmentId, a.UserId, a.TestId, t.Name AS TestName,
+        a.RiderId, a.Status, a.ScheduledDate, a.Address,
+        a.Latitude, a.Longitude, a.ReportFileName, a.ReportUploadedAt, a.CreatedAt
+    FROM Appointments a
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.UserId = @UserId
+      AND a.TestId = @TestId
+      AND CAST(a.ScheduledDate AS DATE) = @Date
+      AND a.Status != 8; -- not cancelled
+END
+GO
+
+-- sp_CreateBooking
+CREATE OR ALTER PROCEDURE sp_CreateBooking
+    @UserId       INT,
+    @TestId       INT,
+    @ScheduledDate DATETIME2,
+    @Address      NVARCHAR(500),
+    @Latitude     FLOAT = NULL,
+    @Longitude    FLOAT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO Appointments
+        (UserId, TestId, ScheduledDate, Address, Latitude, Longitude, Status)
+    VALUES
+        (@UserId, @TestId, @ScheduledDate, @Address, @Latitude, @Longitude, 0);
+
+    SELECT SCOPE_IDENTITY() AS AppointmentId;
+END
+GO
+
+-- sp_GetPatientBookings
+CREATE OR ALTER PROCEDURE sp_GetPatientBookings
+    @UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        a.AppointmentId, a.UserId, a.TestId, t.Name AS TestName,
+        a.RiderId, a.Status, a.ScheduledDate, a.Address,
+        a.Latitude, a.Longitude, a.ReportFileName, a.ReportUploadedAt, a.CreatedAt
+    FROM Appointments a
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.UserId = @UserId
+    ORDER BY a.CreatedAt DESC;
+END
+GO
+
+-- sp_GetAppointmentById (for cancel / ownership check)
+CREATE OR ALTER PROCEDURE sp_GetAppointmentById
+    @AppointmentId INT,
+    @UserId        INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        a.AppointmentId, a.UserId, a.TestId, t.Name AS TestName,
+        a.RiderId, a.Status, a.ScheduledDate, a.Address,
+        a.Latitude, a.Longitude, a.ReportFileName, a.ReportUploadedAt, a.CreatedAt
+    FROM Appointments a
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.AppointmentId = @AppointmentId
+      AND a.UserId = @UserId;
+END
+GO
+
+-- sp_CancelBooking
+CREATE OR ALTER PROCEDURE sp_CancelBooking
+    @AppointmentId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Appointments
+    SET Status = 8 -- Cancelled
+    WHERE AppointmentId = @AppointmentId;
+END
+GO
+
+-- sp_GetAppointmentByReport (ownership check before download)
+CREATE OR ALTER PROCEDURE sp_GetAppointmentByReport
+    @ReportFileName NVARCHAR(500),
+    @UserId         INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TOP 1
+        a.AppointmentId, a.UserId, a.TestId, t.Name AS TestName,
+        a.RiderId, a.Status, a.ScheduledDate, a.Address,
+        a.Latitude, a.Longitude, a.ReportFileName, a.ReportUploadedAt, a.CreatedAt
+    FROM Appointments a
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.ReportFileName = @ReportFileName
+      AND a.UserId = @UserId;
+END
+GO
+
+-- ─────────────────────────────────────────────
+-- 6. ADMIN STORED PROCEDURES
+-- ─────────────────────────────────────────────
+
+-- sp_GetDashboardStats
+CREATE OR ALTER PROCEDURE sp_GetDashboardStats
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        (SELECT COUNT(*) FROM Users WHERE Role = 'Patient')                             AS TotalPatients,
+        (SELECT COUNT(*) FROM Appointments WHERE Status != 8)                           AS TotalAppointments,
+        (SELECT COUNT(*) FROM Appointments WHERE Status = 0)                            AS PendingAppointments,
+        (SELECT COUNT(*) FROM Appointments WHERE Status = 6
+            AND CAST(ScheduledDate AS DATE) = CAST(GETUTCDATE() AS DATE))               AS CompletedToday,
+        (SELECT COUNT(*) FROM Riders WHERE Status = 0)                                  AS ActiveRiders,
+        (SELECT ISNULL(SUM(t.Price), 0)
+         FROM Appointments a
+         JOIN Tests t ON t.TestId = a.TestId
+         WHERE a.Status IN (6, 7)
+           AND YEAR(a.ScheduledDate) = YEAR(GETUTCDATE())
+           AND MONTH(a.ScheduledDate) = MONTH(GETUTCDATE()))                            AS RevenueThisMonth;
+END
+GO
+
+-- sp_GetAppointmentsPaged
+CREATE OR ALTER PROCEDURE sp_GetAppointmentsPaged
+    @Page    INT,
+    @PerPage INT,
+    @Search  NVARCHAR(100) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        a.AppointmentId,
+        a.UserId,
+        u.Username  AS PatientName,
+        u.Email,
+        t.Name      AS TestName,
+        a.Status,
+        a.ScheduledDate,
+        a.Address,
+        r.Name      AS RiderName,
+        a.RiderId,
+        a.ReportFileName,
+        COUNT(*) OVER () AS TotalCount
+    FROM Appointments a
+    JOIN Users  u ON u.UserId   = a.UserId
+    JOIN Tests  t ON t.TestId   = a.TestId
+    LEFT JOIN Riders r ON r.RiderId = a.RiderId
+    WHERE a.Status != 8
+      AND (
+          @Search IS NULL
+          OR u.Username LIKE '%' + @Search + '%'
+          OR u.Email    LIKE '%' + @Search + '%'
+          OR t.Name     LIKE '%' + @Search + '%'
+      )
+    ORDER BY a.CreatedAt DESC
+    OFFSET (@Page - 1) * @PerPage ROWS
+    FETCH NEXT @PerPage ROWS ONLY;
+END
+GO
+
+-- sp_UpdateAppointmentStatus
+CREATE OR ALTER PROCEDURE sp_UpdateAppointmentStatus
+    @AppointmentId INT,
+    @Status        INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Appointments
+    SET Status = @Status
+    WHERE AppointmentId = @AppointmentId;
+END
+GO
+
+-- sp_BulkUpdateStatus
+CREATE OR ALTER PROCEDURE sp_BulkUpdateStatus
+    @AppointmentIds NVARCHAR(MAX), -- comma-separated IDs e.g. '1,2,3'
+    @Status         INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Split comma-separated IDs using STRING_SPLIT (SQL Server 2016+)
+    UPDATE Appointments
+    SET Status = @Status
+    WHERE AppointmentId IN (
+        SELECT CAST(value AS INT)
+        FROM STRING_SPLIT(@AppointmentIds, ',')
+    );
+END
+GO
+
+-- sp_AssignRider (manual assignment)
+CREATE OR ALTER PROCEDURE sp_AssignRider
+    @AppointmentId INT,
+    @RiderId       INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Appointments
+    SET RiderId = @RiderId,
+        Status  = 2 -- AssignedRider
+    WHERE AppointmentId = @AppointmentId;
+
+    -- Update rider status to Busy
+    UPDATE Riders
+    SET Status = 1 -- Busy
+    WHERE RiderId = @RiderId;
+
+    -- Insert notification for the rider
+    INSERT INTO Notifications (RecipientId, RecipientType, AppointmentId, Title, Body)
+    VALUES (
+        @RiderId,
+        'Rider',
+        @AppointmentId,
+        'New Task Assigned',
+        'You have been assigned a new sample collection task. Please check your tasks.'
+    );
+END
+GO
+
+-- sp_AutoAssignRider (finds nearest available rider)
+CREATE OR ALTER PROCEDURE sp_AutoAssignRider
+    @AppointmentId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @AppLat  FLOAT;
+    DECLARE @AppLng  FLOAT;
+    DECLARE @RiderId INT;
+
+    -- Get appointment coordinates
+    SELECT @AppLat = Latitude, @AppLng = Longitude
+    FROM Appointments
+    WHERE AppointmentId = @AppointmentId;
+
+    -- Find the nearest available rider using Haversine-style distance
+    -- If appointment has no GPS, just pick any available rider
+    SELECT TOP 1 @RiderId = r.RiderId
+    FROM Riders r
+    WHERE r.Status = 0 -- Available
+    ORDER BY
+        CASE
+            WHEN @AppLat IS NOT NULL AND @AppLng IS NOT NULL
+                 AND r.LastLatitude IS NOT NULL AND r.LastLongitude IS NOT NULL
+            THEN
+                -- Approximate distance in km (Haversine simplified)
+                SQRT(
+                    POWER((@AppLat - r.LastLatitude) * 111.0, 2) +
+                    POWER((@AppLng - r.LastLongitude) * 111.0 * COS(RADIANS(@AppLat)), 2)
+                )
+            ELSE 0
+        END ASC,
+        r.CreatedAt ASC; -- Tiebreak: longest-registered rider
+
+    IF @RiderId IS NOT NULL
+    BEGIN
+        -- Assign the rider
+        UPDATE Appointments
+        SET RiderId = @RiderId,
+            Status  = 2 -- AssignedRider
+        WHERE AppointmentId = @AppointmentId;
+
+        -- Mark rider as busy
+        UPDATE Riders
+        SET Status = 1 -- Busy
+        WHERE RiderId = @RiderId;
+
+        -- Notify rider
+        INSERT INTO Notifications (RecipientId, RecipientType, AppointmentId, Title, Body)
+        VALUES (
+            @RiderId,
+            'Rider',
+            @AppointmentId,
+            'New Task Assigned',
+            'You have been auto-assigned a new sample collection task.'
+        );
+    END
+
+    SELECT @RiderId AS AssignedRiderId;
+END
+GO
+
+-- sp_SaveReportPath
+CREATE OR ALTER PROCEDURE sp_SaveReportPath
+    @AppointmentId  INT,
+    @ReportFileName NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Appointments
+    SET ReportFileName   = @ReportFileName,
+        ReportUploadedAt = GETUTCDATE(),
+        Status           = 7 -- ReportUploaded
+    WHERE AppointmentId = @AppointmentId;
+
+    -- Notify patient
+    DECLARE @UserId INT;
+    SELECT @UserId = UserId FROM Appointments WHERE AppointmentId = @AppointmentId;
+
+    INSERT INTO Notifications (RecipientId, RecipientType, AppointmentId, Title, Body)
+    VALUES (
+        @UserId,
+        'User',
+        @AppointmentId,
+        'Report Ready',
+        'Your lab report is ready. You can now download it from your dashboard.'
+    );
+END
+GO
+
+-- sp_GetAllPatients
+CREATE OR ALTER PROCEDURE sp_GetAllPatients
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        u.UserId,
+        u.Username,
+        u.Email,
+        COUNT(a.AppointmentId) AS TotalBookings,
+        u.CreatedAt
+    FROM Users u
+    LEFT JOIN Appointments a ON a.UserId = u.UserId AND a.Status != 8
+    WHERE u.Role = 'Patient'
+    GROUP BY u.UserId, u.Username, u.Email, u.CreatedAt
+    ORDER BY u.CreatedAt DESC;
+END
+GO
+
+-- sp_GetAllTests
+CREATE OR ALTER PROCEDURE sp_GetAllTests
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TestId, Name, Description, Price, Duration, IsActive, CreatedAt
+    FROM Tests
+    ORDER BY Name;
+END
+GO
+
+-- sp_CreateTest
+CREATE OR ALTER PROCEDURE sp_CreateTest
+    @Name        NVARCHAR(200),
+    @Description NVARCHAR(1000),
+    @Price       DECIMAL(10,2),
+    @Duration    INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO Tests (Name, Description, Price, Duration, IsActive)
+    VALUES (@Name, @Description, @Price, @Duration, 1);
+END
+GO
+
+-- sp_UpdateTest
+CREATE OR ALTER PROCEDURE sp_UpdateTest
+    @TestId      INT,
+    @Name        NVARCHAR(200),
+    @Description NVARCHAR(1000),
+    @Price       DECIMAL(10,2),
+    @Duration    INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Tests
+    SET Name        = @Name,
+        Description = @Description,
+        Price       = @Price,
+        Duration    = @Duration
+    WHERE TestId = @TestId;
+END
+GO
+
+-- sp_DeleteTest (soft delete — marks inactive)
+CREATE OR ALTER PROCEDURE sp_DeleteTest
+    @TestId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Tests SET IsActive = 0 WHERE TestId = @TestId;
+END
+GO
+
+-- sp_GetAllRiders
+CREATE OR ALTER PROCEDURE sp_GetAllRiders
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        r.RiderId,
+        r.Name,
+        r.Email,
+        r.Phone,
+        r.Status,
+        r.LastLatitude,
+        r.LastLongitude,
+        r.CreatedAt,
+        COUNT(tl.LogId) AS TotalTasksCompleted
+    FROM Riders r
+    LEFT JOIN TaskLogs tl ON tl.RiderId = r.RiderId AND tl.Action = 'Delivered'
+    GROUP BY r.RiderId, r.Name, r.Email, r.Phone, r.Status,
+             r.LastLatitude, r.LastLongitude, r.CreatedAt
+    ORDER BY r.CreatedAt DESC;
+END
+GO
+
+-- sp_GetRiderById
+CREATE OR ALTER PROCEDURE sp_GetRiderById
+    @RiderId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        r.RiderId,
+        r.Name,
+        r.Email,
+        r.Phone,
+        r.PasswordHash,
+        r.PhotoPath,
+        r.Status,
+        r.LastLatitude,
+        r.LastLongitude,
+        r.LastLocationAt,
+        r.CreatedAt,
+        COUNT(tl.LogId) AS TotalTasksCompleted
+    FROM Riders r
+    LEFT JOIN TaskLogs tl ON tl.RiderId = r.RiderId AND tl.Action = 'Delivered'
+    WHERE r.RiderId = @RiderId
+    GROUP BY r.RiderId, r.Name, r.Email, r.Phone, r.PasswordHash, r.PhotoPath,
+             r.Status, r.LastLatitude, r.LastLongitude, r.LastLocationAt, r.CreatedAt;
+END
+GO
+
+-- sp_CreateRider
+CREATE OR ALTER PROCEDURE sp_CreateRider
+    @Name         NVARCHAR(100),
+    @Email        NVARCHAR(255),
+    @Phone        NVARCHAR(20),
+    @PasswordHash NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO Riders (Name, Email, Phone, PasswordHash, Status)
+    VALUES (@Name, @Email, @Phone, @PasswordHash, 0); -- starts Available
+END
+GO
+
+-- sp_DeleteRider
+CREATE OR ALTER PROCEDURE sp_DeleteRider
+    @RiderId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DELETE FROM Riders WHERE RiderId = @RiderId;
+END
+GO
+
+-- ─────────────────────────────────────────────
+-- 7. RIDER STORED PROCEDURES
+-- ─────────────────────────────────────────────
+
+-- sp_GetRiderByEmail
+CREATE OR ALTER PROCEDURE sp_GetRiderByEmail
+    @Email NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT RiderId, Name, Email, Phone, PasswordHash,
+           PhotoPath, Status, LastLatitude, LastLongitude,
+           LastLocationAt, CreatedAt
+    FROM Riders
+    WHERE Email = @Email;
+END
+GO
+
+-- sp_GetActiveTasksByRider
+CREATE OR ALTER PROCEDURE sp_GetActiveTasksByRider
+    @RiderId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        a.AppointmentId,
+        a.UserId,
+        u.Username  AS PatientName,
+        u.Email     AS PatientPhone, -- using email as contact until phone added to Users
+        t.Name      AS TestName,
+        a.Address,
+        a.Latitude,
+        a.Longitude,
+        a.Status,
+        a.ScheduledDate
+    FROM Appointments a
+    JOIN Users u ON u.UserId = a.UserId
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.RiderId = @RiderId
+      AND a.Status IN (2, 3, 4, 5) -- AssignedRider, OnWay, Arrived, Collected
+    ORDER BY a.ScheduledDate ASC;
+END
+GO
+
+-- sp_GetTaskHistoryByRider
+CREATE OR ALTER PROCEDURE sp_GetTaskHistoryByRider
+    @RiderId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        a.AppointmentId,
+        a.UserId,
+        u.Username  AS PatientName,
+        u.Email     AS PatientPhone,
+        t.Name      AS TestName,
+        a.Address,
+        a.Latitude,
+        a.Longitude,
+        a.Status,
+        a.ScheduledDate
+    FROM Appointments a
+    JOIN Users u ON u.UserId = a.UserId
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.RiderId = @RiderId
+      AND a.Status IN (6, 7, 8) -- Delivered, ReportUploaded, Cancelled
+    ORDER BY a.ScheduledDate DESC;
+END
+GO
+
+-- sp_GetTaskByIdAndRider
+CREATE OR ALTER PROCEDURE sp_GetTaskByIdAndRider
+    @AppointmentId INT,
+    @RiderId       INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        a.AppointmentId,
+        a.UserId,
+        u.Username  AS PatientName,
+        u.Email     AS PatientPhone,
+        t.Name      AS TestName,
+        a.Address,
+        a.Latitude,
+        a.Longitude,
+        a.Status,
+        a.ScheduledDate
+    FROM Appointments a
+    JOIN Users u ON u.UserId = a.UserId
+    JOIN Tests t ON t.TestId = a.TestId
+    WHERE a.AppointmentId = @AppointmentId
+      AND a.RiderId = @RiderId;
+END
+GO
+
+-- sp_InsertTaskLog
+CREATE OR ALTER PROCEDURE sp_InsertTaskLog
+    @AppointmentId INT,
+    @RiderId       INT,
+    @Action        NVARCHAR(50),
+    @Notes         NVARCHAR(1000) = NULL,
+    @PhotoPath     NVARCHAR(500)  = NULL,
+    @Latitude      FLOAT          = NULL,
+    @Longitude     FLOAT          = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO TaskLogs
+        (AppointmentId, RiderId, Action, Notes, PhotoPath, Latitude, Longitude)
+    VALUES
+        (@AppointmentId, @RiderId, @Action, @Notes, @PhotoPath, @Latitude, @Longitude);
+
+    -- When delivered, mark rider as Available again
+    IF @Action = 'Delivered'
+    BEGIN
+        UPDATE Riders SET Status = 0 WHERE RiderId = @RiderId;
+
+        -- Notify the patient
+        DECLARE @UserId INT;
+        SELECT @UserId = UserId FROM Appointments WHERE AppointmentId = @AppointmentId;
+
+        INSERT INTO Notifications (RecipientId, RecipientType, AppointmentId, Title, Body)
+        VALUES (
+            @UserId,
+            'User',
+            @AppointmentId,
+            'Sample Delivered',
+            'Your sample has been delivered to the lab. Your report will be ready soon.'
+        );
+    END
+
+    -- When collected, notify patient
+    IF @Action = 'Collected'
+    BEGIN
+        DECLARE @UserId2 INT;
+        SELECT @UserId2 = UserId FROM Appointments WHERE AppointmentId = @AppointmentId;
+
+        INSERT INTO Notifications (RecipientId, RecipientType, AppointmentId, Title, Body)
+        VALUES (
+            @UserId2,
+            'User',
+            @AppointmentId,
+            'Sample Collected',
+            'Your sample has been successfully collected and is on its way to the lab.'
+        );
+    END
+END
+GO
+
+-- sp_UpdateRiderLocation
+CREATE OR ALTER PROCEDURE sp_UpdateRiderLocation
+    @RiderId   INT,
+    @Latitude  FLOAT,
+    @Longitude FLOAT,
+    @Status    INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Riders
+    SET LastLatitude   = @Latitude,
+        LastLongitude  = @Longitude,
+        LastLocationAt = GETUTCDATE(),
+        Status         = @Status
+    WHERE RiderId = @RiderId;
+END
+GO
+
+-- sp_GetRiderNotifications
+CREATE OR ALTER PROCEDURE sp_GetRiderNotifications
+    @RiderId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT NotificationId, Title, Body, IsRead, CreatedAt
+    FROM Notifications
+    WHERE RecipientId   = @RiderId
+      AND RecipientType = 'Rider'
+    ORDER BY CreatedAt DESC;
+END
+GO
+
+-- sp_MarkNotificationRead
+CREATE OR ALTER PROCEDURE sp_MarkNotificationRead
+    @NotificationId INT,
+    @RiderId        INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Notifications
+    SET IsRead = 1
+    WHERE NotificationId = @NotificationId
+      AND RecipientId    = @RiderId
+      AND RecipientType  = 'Rider';
+END
+GO
+
+-- sp_MarkAllNotificationsRead
+CREATE OR ALTER PROCEDURE sp_MarkAllNotificationsRead
+    @RiderId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Notifications
+    SET IsRead = 1
+    WHERE RecipientId   = @RiderId
+      AND RecipientType = 'Rider';
+END
+GO
+
+-- ─────────────────────────────────────────────
+-- 8. VERIFY — list all objects created
+-- ─────────────────────────────────────────────
+SELECT 'Tables' AS Type, name FROM sys.tables ORDER BY name;
+SELECT 'Stored Procedures' AS Type, name FROM sys.procedures ORDER BY name;
+GO
+
+PRINT '✅ HomeSamplingDB setup complete!';
+PRINT '   Tables created:  Users, Otps, Tests, Riders, Appointments, TaskLogs, Notifications';
+PRINT '   Stored procs:    35 procedures created';
+PRINT '   Seed data:       1 admin user + 10 sample tests inserted';
+PRINT '';
+PRINT '   Default admin credentials:';
+PRINT '   Email:    admin@homesampling.com';
+PRINT '   Password: Admin@123';
+GO

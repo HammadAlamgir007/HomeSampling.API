@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,17 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="DBContext\" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.1" />
+    <PackageReference Include="Twilio" Version="7.14.9" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Module.Rider.Core\Module.Rider.Core.csproj" />
     <ProjectReference Include="..\Shared.Infrastructure\Shared.Infrastructure.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.1" />
-    <PackageReference Include="Twilio" Version="7.14.9" />
   </ItemGroup>
 
 </Project>

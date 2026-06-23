@@ -1,4 +1,4 @@
-﻿namespace Shared.Infrastructure.Enums;
+namespace Shared.Infrastructure.Enums;
 
 public enum UserRole
 {

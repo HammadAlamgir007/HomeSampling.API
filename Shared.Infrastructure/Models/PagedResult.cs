@@ -1,4 +1,4 @@
-﻿namespace Shared.Infrastructure.Models;
+namespace Shared.Infrastructure.Models;
 
 public class PagedResult<T>
 {

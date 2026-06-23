@@ -1,4 +1,4 @@
-﻿using Shared.Infrastructure.Models;
+using Shared.Infrastructure.Models;
 
 namespace Shared.Infrastructure.Helpers;
 

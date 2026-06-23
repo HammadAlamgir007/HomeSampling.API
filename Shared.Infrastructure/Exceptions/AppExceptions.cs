@@ -1,4 +1,4 @@
-﻿namespace Shared.Infrastructure.Exceptions;
+namespace Shared.Infrastructure.Exceptions;
 
 public class AppException(string message) : Exception(message);
 
