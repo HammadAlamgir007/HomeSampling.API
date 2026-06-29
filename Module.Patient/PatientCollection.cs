@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Module.Patient.Core.Services;
+using Module.Patient.Core.DBContext;
 using Module.Patient.Infrastructure.DBContext;
 
 namespace Module.Patient;

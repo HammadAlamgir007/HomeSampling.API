@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Module.Auth.Core.Services;
+using Module.Auth.Core.DBContext;
 using Module.Auth.Infrastructure.DBContext;
 
 namespace Module.Auth;

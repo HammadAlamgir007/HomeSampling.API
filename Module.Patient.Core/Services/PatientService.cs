@@ -1,5 +1,5 @@
 using Module.Patient.Core.DTOs;
-using Module.Patient.Infrastructure.DBContext;
+using Module.Patient.Core.DBContext;
 using Shared.Infrastructure.Enums;
 using Shared.Infrastructure.Exceptions;
 using Shared.Infrastructure.Helpers;

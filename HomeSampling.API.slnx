@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="HomeSampling/HomeSampling.API.csproj" />
+  <Project Path="HomeSampling.API/HomeSampling.API.csproj" />
   <Project Path="Module.Admin.Core/Module.Admin.Core.csproj" />
   <Project Path="Module.Admin.Infrastructure/Module.Admin.Infrastructure.csproj" />
   <Project Path="Module.Admin/Module.Admin.csproj" />

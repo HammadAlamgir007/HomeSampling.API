@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Module.Rider.Core.Services;
+using Module.Rider.Core.DBContext;
 using Module.Rider.Infrastructure.DBContext;
 
 namespace Module.Rider;

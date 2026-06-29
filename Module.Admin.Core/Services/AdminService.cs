@@ -1,5 +1,5 @@
 using Module.Admin.Core.DTOs;
-using Module.Admin.Infrastructure.DBContext;
+using Module.Admin.Core.DBContext;
 using Shared.Infrastructure.Enums;
 using Shared.Infrastructure.Helpers;
 using Shared.Infrastructure.Models;

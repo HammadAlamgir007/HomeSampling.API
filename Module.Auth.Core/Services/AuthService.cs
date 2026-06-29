@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Module.Auth.Core.DBOs;
 using Module.Auth.Core.DTOs;
-using Module.Auth.Infrastructure.DBContext;
+using Module.Auth.Core.DBContext;
 using Shared.Infrastructure.Helpers;
 using Shared.Infrastructure.Models;
 using Shared.Infrastructure.Services;

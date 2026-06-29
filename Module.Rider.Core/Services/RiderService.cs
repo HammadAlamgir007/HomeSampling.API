@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Module.Rider.Core.DTOs;
-using Module.Rider.Infrastructure.DBContext;
+using Module.Rider.Core.DBContext;
 using Shared.Infrastructure.Enums;
 using Shared.Infrastructure.Helpers;
 using Shared.Infrastructure.Models;

@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Module.Admin.Core.DBOs;
+using Module.Admin.Core.DBContext;
 using Shared.Infrastructure.DBContext;
 using Shared.Infrastructure.Models;
 

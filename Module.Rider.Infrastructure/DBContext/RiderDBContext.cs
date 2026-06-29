@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Module.Rider.Core.DBOs;
+using Module.Rider.Core.DBContext;
 using Shared.Infrastructure.DBContext;
 using Shared.Infrastructure.Models;
 

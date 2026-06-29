@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Module.Admin.Core.Services;
+using Module.Admin.Core.DBContext;
 using Module.Admin.Infrastructure.DBContext;
 
 namespace Module.Admin;
