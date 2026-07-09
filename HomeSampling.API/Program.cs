@@ -87,9 +87,37 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// ... (all your other code above remains exactly the same)
+
 app.UseHttpsRedirection();
 app.UseAuthentication(); // before Authorization
 app.UseAuthorization();
+
 app.MapControllers();
+
+// ── TEST ENDPOINT ────────────────────────────────────────────────
+app.MapGet("/api/test-db", (IConfiguration configuration) =>
+{
+    string? connectionString = configuration.GetConnectionString("DefaultConnection");
+
+    using (Microsoft.Data.SqlClient.SqlConnection connection = new(connectionString))
+    {
+        try
+        {
+            connection.Open();
+            using (Microsoft.Data.SqlClient.SqlCommand command = new("SELECT 1", connection))
+            {
+                command.ExecuteScalar();
+            }
+
+            return Results.Ok(new { status = "Success", message = "ADO.NET successfully connected to HomeSamplingDB!" });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"Database connection failed: {ex.Message}");
+        }
+    }
+});
+// ─────────────────────────────────────────────────────────────────
 
 app.Run();

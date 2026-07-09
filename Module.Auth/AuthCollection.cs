@@ -1,18 +1,18 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Module.Auth.Core.Services;
-using Module.Auth.Core.DBContext;
-using Module.Auth.Infrastructure.DBContext;
+    using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.DependencyInjection;
+    using Module.Auth.Core.Services;
+    using Module.Auth.Core.DBContext;
+    using Module.Auth.Infrastructure.DBContext;
 
-namespace Module.Auth;
+    namespace Module.Auth;
 
-public static class AuthCollection
-{
-    public static IServiceCollection AddModuleAuth(
-        this IServiceCollection services, IConfiguration config)
+    public static class AuthCollection
     {
-        services.AddScoped<IAuthDBContext, AuthDBContext>();
-        services.AddScoped<IAuthService, AuthService>();
-        return services;
+        public static IServiceCollection AddModuleAuth(
+            this IServiceCollection services, IConfiguration config)
+        {
+            services.AddScoped<IAuthDBContext, AuthDBContext>();
+            services.AddScoped<IAuthService, AuthService>();
+            return services;
+        }
     }
-}
