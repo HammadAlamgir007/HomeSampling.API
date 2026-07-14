@@ -7,8 +7,7 @@ namespace Shared.Infrastructure.DBContext;
 
 public abstract class BaseDBContext
 {
-    private readonly string _connectionString;
-
+        private readonly String _connectionString;
     protected BaseDBContext(IOptions<DatabaseConnection> options)
     {
         _connectionString = options.Value.DefaultConnection;
