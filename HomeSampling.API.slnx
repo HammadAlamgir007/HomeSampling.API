@@ -1,18 +1,28 @@
 <Solution>
+  <Folder Name="/Admin/">
+    <Project Path="Module.Admin.Core/Module.Admin.Core.csproj" />
+    <Project Path="Module.Admin.Infrastructure/Module.Admin.Infrastructure.csproj" />
+    <Project Path="Module.Admin/Module.Admin.csproj" />
+  </Folder>
+  <Folder Name="/Auth/">
+    <Project Path="Module.Auth.Core/Module.Auth.Core.csproj" />
+    <Project Path="Module.Auth.Infrastructure/Module.Auth.Infrastructure.csproj" />
+    <Project Path="Module.Auth/Module.Auth.csproj" />
+  </Folder>
+  <Folder Name="/Contact/">
+    <Project Path="Module.Contact.Core/Module.Contact.Core.csproj" />
+    <Project Path="Module.Contact/Module.Contact.csproj" />
+  </Folder>
+  <Folder Name="/Patient/">
+    <Project Path="Module.Patient.Core/Module.Patient.Core.csproj" />
+    <Project Path="Module.Patient.Infrastructure/Module.Patient.Infrastructure.csproj" />
+    <Project Path="Module.Patient/Module.Patient.csproj" />
+  </Folder>
+  <Folder Name="/Rider/">
+    <Project Path="Module.Rider.Core/Module.Rider.Core.csproj" />
+    <Project Path="Module.Rider.Infrastructure/Module.Rider.Infrastructure.csproj" />
+    <Project Path="Module.Rider/Module.Rider.csproj" />
+  </Folder>
   <Project Path="HomeSampling.API/HomeSampling.API.csproj" />
-  <Project Path="Module.Admin.Core/Module.Admin.Core.csproj" />
-  <Project Path="Module.Admin.Infrastructure/Module.Admin.Infrastructure.csproj" />
-  <Project Path="Module.Admin/Module.Admin.csproj" />
-  <Project Path="Module.Auth.Core/Module.Auth.Core.csproj" />
-  <Project Path="Module.Auth.Infrastructure/Module.Auth.Infrastructure.csproj" />
-  <Project Path="Module.Auth/Module.Auth.csproj" />
-  <Project Path="Module.Contact.Core/Module.Contact.Core.csproj" />
-  <Project Path="Module.Contact/Module.Contact.csproj" />
-  <Project Path="Module.Patient.Core/Module.Patient.Core.csproj" />
-  <Project Path="Module.Patient.Infrastructure/Module.Patient.Infrastructure.csproj" />
-  <Project Path="Module.Patient/Module.Patient.csproj" />
-  <Project Path="Module.Rider.Core/Module.Rider.Core.csproj" />
-  <Project Path="Module.Rider.Infrastructure/Module.Rider.Infrastructure.csproj" />
-  <Project Path="Module.Rider/Module.Rider.csproj" />
   <Project Path="Shared.Infrastructure/Shared.Infrastructure.csproj" Id="79b3312e-4654-42aa-8e19-c69f5e4b85cb" />
 </Solution>

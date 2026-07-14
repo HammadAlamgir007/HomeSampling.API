@@ -1,4 +1,3 @@
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Module.Auth.Core.DBOs;
 using Module.Auth.Core.DBContext;
@@ -9,82 +8,106 @@ namespace Module.Auth.Infrastructure.DBContext;
 
 public class AuthDBContext : BaseDBContext, IAuthDBContext
 {
-    public AuthDBContext(IOptions<DatabaseConnection> options) : base(options) { }
+    public AuthDBContext(IOptions<DatabaseConnection> options)
+        : base(options)
+    {
+    }
 
-    public async Task<UserDbo?> GetUserByEmailAsync(string email) =>
-        await QuerySingleAsync(
+    public async Task<UserDbo?> GetUserByEmailAsync(string email)
+    {
+        return await QuerySingleAsync<UserDbo>(
             "sp_GetUserByEmail",
-            [new SqlParameter("@Email", email)],
-            MapUser);
-
-    public async Task<OtpDbo?> GetLatestOtpAsync(string email, string purpose) =>
-        await QuerySingleAsync(
-            "sp_GetLatestOtp",
-            [
-                new SqlParameter("@Email", email),
-                new SqlParameter("@Purpose", purpose)
-            ],
-            r => new OtpDbo
+            new
             {
-                OtpId     = r.GetInt32(r.GetOrdinal("OtpId")),
-                Email     = r.GetString(r.GetOrdinal("Email")),
-                Code      = r.GetString(r.GetOrdinal("Code")),
-                Purpose   = r.GetString(r.GetOrdinal("Purpose")),
-                ExpiresAt = r.GetDateTime(r.GetOrdinal("ExpiresAt")),
-                IsUsed    = r.GetBoolean(r.GetOrdinal("IsUsed")),
-                CreatedAt = r.GetDateTime(r.GetOrdinal("CreatedAt"))
+                Email = email
             });
+    }
+
+    public async Task<OtpDbo?> GetLatestOtpAsync(string email, string purpose)
+    {
+        return await QuerySingleAsync<OtpDbo>(
+            "sp_GetLatestOtp",
+            new
+            {
+                Email = email,
+                Purpose = purpose
+            });
+    }
 
     public async Task CreateUserAsync(
-        string username, string email,
-        string passwordHash, string role) =>
-        await ExecuteAsync("sp_CreateUser",
-        [
-            new SqlParameter("@Username",     username),
-            new SqlParameter("@Email",        email),
-            new SqlParameter("@PasswordHash", passwordHash),
-            new SqlParameter("@Role",         role)
-        ]);
+        string username,
+        string email,
+        string passwordHash,
+        string role)
+    {
+        await ExecuteAsync(
+            "sp_CreateUser",
+            new
+            {
+                Username = username,
+                Email = email,
+                PasswordHash = passwordHash,
+                Role = role
+            });
+    }
 
     public async Task CreateOtpAsync(
-        string email, string code,
-        string purpose, DateTime expiresAt) =>
-        await ExecuteAsync("sp_CreateOtp",
-        [
-            new SqlParameter("@Email",     email),
-            new SqlParameter("@Code",      code),
-            new SqlParameter("@Purpose",   purpose),
-            new SqlParameter("@ExpiresAt", expiresAt)
-        ]);
-
-    public async Task MarkOtpUsedAsync(int otpId) =>
-        await ExecuteAsync("sp_MarkOtpUsed",
-            [new SqlParameter("@OtpId", otpId)]);
-
-    public async Task UpdatePasswordAsync(string email, string newPasswordHash) =>
-        await ExecuteAsync("sp_UpdatePassword",
-        [
-            new SqlParameter("@Email",           email),
-            new SqlParameter("@NewPasswordHash", newPasswordHash)
-        ]);
-
-    public async Task IncrementLoginAttemptsAsync(string email) =>
-        await ExecuteAsync("sp_IncrementLoginAttempts",
-            [new SqlParameter("@Email", email)]);
-
-    public async Task ResetLoginAttemptsAsync(string email) =>
-        await ExecuteAsync("sp_ResetLoginAttempts",
-            [new SqlParameter("@Email", email)]);
-
-    private static UserDbo MapUser(SqlDataReader r) => new()
+        string email,
+        string code,
+        string purpose,
+        DateTime expiresAt)
     {
-        UserId        = r.GetInt32(r.GetOrdinal("UserId")),
-        Username      = r.GetString(r.GetOrdinal("Username")),
-        Email         = r.GetString(r.GetOrdinal("Email")),
-        PasswordHash  = r.GetString(r.GetOrdinal("PasswordHash")),
-        Role          = r.GetString(r.GetOrdinal("Role")),
-        IsLocked      = r.GetBoolean(r.GetOrdinal("IsLocked")),
-        LoginAttempts = r.GetInt32(r.GetOrdinal("LoginAttempts")),
-        CreatedAt     = r.GetDateTime(r.GetOrdinal("CreatedAt"))
-    };
+        await ExecuteAsync(
+            "sp_CreateOtp",
+            new
+            {
+                Email = email,
+                Code = code,
+                Purpose = purpose,
+                ExpiresAt = expiresAt
+            });
+    }
+
+    public async Task MarkOtpUsedAsync(int otpId)
+    {
+        await ExecuteAsync(
+            "sp_MarkOtpUsed",
+            new
+            {
+                OtpId = otpId
+            });
+    }
+
+    public async Task UpdatePasswordAsync(
+        string email,
+        string newPasswordHash)
+    {
+        await ExecuteAsync(
+            "sp_UpdatePassword",
+            new
+            {
+                Email = email,
+                NewPasswordHash = newPasswordHash
+            });
+    }
+
+    public async Task IncrementLoginAttemptsAsync(string email)
+    {
+        await ExecuteAsync(
+            "sp_IncrementLoginAttempts",
+            new
+            {
+                Email = email
+            });
+    }
+
+    public async Task ResetLoginAttemptsAsync(string email)
+    {
+        await ExecuteAsync(
+            "sp_ResetLoginAttempts",
+            new
+            {
+                Email = email
+            });
+    }
 }

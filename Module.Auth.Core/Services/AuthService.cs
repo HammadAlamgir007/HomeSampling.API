@@ -9,6 +9,7 @@ using Shared.Infrastructure.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using AutoMapper;
 
 namespace Module.Auth.Core.Services;
 
@@ -18,17 +19,20 @@ public class AuthService : IAuthService
     private readonly IEmailService _email;
     private readonly IGuidService _guid;
     private readonly IConfiguration _config;
+    private readonly IMapper _mapper;
 
     public AuthService(
         IAuthDBContext db,
         IEmailService email,
         IGuidService guid,
-        IConfiguration config)
+        IConfiguration config,
+         IMapper mapper)
     {
         _db     = db;
         _email  = email;
         _guid   = guid;
         _config = config;
+        _mapper = mapper;
     }
 
     public async Task<ApiResponse<MessageResponseDto>> SendOtpAsync(SendOtpRequestDto dto)
@@ -72,41 +76,35 @@ public class AuthService : IAuthService
         return result.ToSuccessResponse(traceId);
     }
 
-    public async Task<ApiResponse<TokenResponseDto>> LoginAsync(LoginRequestDto dto)
+    public async Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto dto)
     {
         var traceId = _guid.NewGuid();
         var user = await _db.GetUserByEmailAsync(dto.Email);
 
         if (user is null)
         {
-            var err = new TokenResponseDto();
+            var err = new LoginResponseDto();
             return err.ToErrorResponse(traceId, "Invalid email or password.", "01");
         }
 
         if (user.IsLocked)
         {
-            var err = new TokenResponseDto();
+            var err = new LoginResponseDto();
             return err.ToErrorResponse(traceId, "Account locked. Contact support.", "03");
         }
 
         if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {
             await _db.IncrementLoginAttemptsAsync(dto.Email);
-            var err = new TokenResponseDto();
+            var err = new LoginResponseDto();
             return err.ToErrorResponse(traceId, "Invalid email or password.", "01");
         }
 
         await _db.ResetLoginAttemptsAsync(dto.Email);
         var token = GenerateJwtToken(user);
 
-        var result = new TokenResponseDto
-        {
-            Token    = token,
-            Username = user.Username,
-            Email    = user.Email,
-            Role     = user.Role
-        };
-        return result.ToSuccessResponse(traceId, "Login successful.");
+        var result = _mapper.Map<LoginResponseDto>(user);
+        return.Toeken = token;
     }
 
     public async Task<ApiResponse<MessageResponseDto>> ForgotPasswordAsync(ForgotPasswordRequestDto dto)

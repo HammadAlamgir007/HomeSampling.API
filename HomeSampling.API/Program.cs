@@ -12,7 +12,6 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
 var config   = builder.Configuration;
-
 // ── CORS ────────────────────────────────────────────────────────
 var allowedOrigins = config.GetSection("AllowedOrigins").Get<string[]>()!;
 services.AddCors(opt => opt.AddPolicy("ReactApp", policy =>
@@ -50,6 +49,7 @@ services.AddModuleContact(config);
 
 // ── Core ASP.NET ─────────────────────────────────────────────────
 services.AddControllers();
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen(opt =>
 {

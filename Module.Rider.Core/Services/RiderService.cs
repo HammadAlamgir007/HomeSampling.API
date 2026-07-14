@@ -10,6 +10,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Module.Rider.Core.DBOs;
+using AutoMapper;
 
 namespace Module.Rider.Core.Services;
 
@@ -19,7 +20,7 @@ public class RiderService : IRiderService
     private readonly IFileService _file;
     private readonly IGuidService _guid;
     private readonly IConfiguration _config;
-
+    private readonly IMapper _mapper;
     private static readonly Dictionary<AppointmentStatus, AppointmentStatus> ValidTransitions = new()
     {
         [AppointmentStatus.AssignedRider] = AppointmentStatus.OnWay,
@@ -28,15 +29,19 @@ public class RiderService : IRiderService
         [AppointmentStatus.Collected]     = AppointmentStatus.Delivered
     };
 
-    public RiderService(IRiderDBContext db, IFileService file,
-        IGuidService guid, IConfiguration config)
+    public RiderService(
+     IRiderDBContext db,
+     IFileService file,
+     IGuidService guid,
+     IConfiguration config,
+     IMapper mapper)
     {
-        _db     = db;
-        _file   = file;
-        _guid   = guid;
+        _db = db;
+        _file = file;
+        _guid = guid;
         _config = config;
+        _mapper = mapper;
     }
-
     public async Task<ApiResponse<RiderTokenDto>> LoginAsync(RiderLoginDto dto)
     {
         var traceId = _guid.NewGuid();
@@ -49,7 +54,8 @@ public class RiderService : IRiderService
         }
 
         var token  = GenerateJwtToken(rider.RiderId, rider.Email, rider.Name);
-        var result = new RiderTokenDto { Token = token, Name = rider.Name, Email = rider.Email };
+        var result = _mapper.Map<RiderTokenDto>(rider);
+        result.Token = token;
         return result.ToSuccessResponse(traceId, "Login successful.");
     }
 
@@ -59,15 +65,7 @@ public class RiderService : IRiderService
         if (rider is null)
             return new RiderProfileDto().ToErrorResponse(_guid.NewGuid(), "Rider not found.", "04");
 
-        var result = new RiderProfileDto
-        {
-            RiderId   = rider.RiderId,
-            Name      = rider.Name,
-            Email     = rider.Email,
-            Phone     = rider.Phone,
-            PhotoPath = rider.PhotoPath,
-            Status    = ((RiderStatus)rider.Status).ToString()
-        };
+        var result = _mapper.Map<RiderProfileDto>(rider);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
@@ -82,14 +80,14 @@ public class RiderService : IRiderService
     public async Task<ApiResponse<List<TaskDto>>> GetActiveTasksAsync(int riderId)
     {
         var tasks  = await _db.GetActiveTasksAsync(riderId);
-        var result = tasks.Select(MapTask).ToList();
+        var result = _mapper.Map<List<TaskDto>>(tasks);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
     public async Task<ApiResponse<List<TaskDto>>> GetTaskHistoryAsync(int riderId)
     {
         var tasks  = await _db.GetTaskHistoryAsync(riderId);
-        var result = tasks.Select(MapTask).ToList();
+        var result = _mapper.Map<List<TaskDto>>(tasks);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
@@ -134,14 +132,7 @@ public class RiderService : IRiderService
     public async Task<ApiResponse<List<NotificationDto>>> GetNotificationsAsync(int riderId)
     {
         var notifications = await _db.GetNotificationsAsync(riderId);
-        var result = notifications.Select(n => new NotificationDto
-        {
-            NotificationId = n.NotificationId,
-            Title          = n.Title,
-            Body           = n.Body,
-            IsRead         = n.IsRead,
-            CreatedAt      = n.CreatedAt
-        }).ToList();
+        var result = _mapper.Map<List<NotificationDto>>(notifications);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
@@ -160,19 +151,7 @@ public class RiderService : IRiderService
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
-    private static TaskDto MapTask(TaskDbo t) => new()
-    {
-        AppointmentId = t.AppointmentId,
-        PatientName   = t.PatientName,
-        PatientPhone  = t.PatientPhone,
-        TestName      = t.TestName,
-        Address       = t.Address,
-        Latitude      = t.Latitude,
-        Longitude     = t.Longitude,
-        Status        = ((AppointmentStatus)t.Status).ToString(),
-        ScheduledDate = t.ScheduledDate
-    };
-
+   
     private string GenerateJwtToken(int riderId, string email, string name)
     {
         var key    = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));

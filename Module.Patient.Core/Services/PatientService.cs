@@ -5,7 +5,7 @@ using Shared.Infrastructure.Exceptions;
 using Shared.Infrastructure.Helpers;
 using Shared.Infrastructure.Models;
 using Shared.Infrastructure.Services;
-
+using AutoMapper;
 namespace Module.Patient.Core.Services;
 
 public class PatientService : IPatientService
@@ -14,30 +14,34 @@ public class PatientService : IPatientService
     private readonly IEmailService _email;
     private readonly IFileService _file;
     private readonly IGuidService _guid;
+    private readonly IMapper _mapper;
 
     public PatientService(
         IPatientDBContext db,
         IEmailService email,
         IFileService file,
-        IGuidService guid)
+        IGuidService guid,
+        IMapper mapper)
     {
         _db    = db;
         _email = email;
         _file  = file;
         _guid  = guid;
+        _mapper = mapper;
     }
 
     public async Task<ApiResponse<List<TestDto>>> GetTestsAsync()
     {
         var tests = await _db.GetActiveTestsAsync();
-        var result = tests.Select(t => new TestDto
-        {
-            TestId      = t.TestId,
-            Name        = t.Name,
-            Description = t.Description,
-            Price       = t.Price,
-            Duration    = t.Duration
-        }).ToList();
+        var result = _mapper.Map<List < TestDto >> (tests);
+        //    tests.Select(t => new TestDto
+        //{
+        //    TestId      = t.TestId,
+        //    Name        = t.Name,
+        //    Description = t.Description,
+        //    Price       = t.Price,
+        //    Duration    = t.Duration
+        //}).ToList();
 
         return result.ToSuccessResponse(_guid.NewGuid());
     }
@@ -73,17 +77,8 @@ public class PatientService : IPatientService
     public async Task<ApiResponse<List<BookingDto>>> GetBookingsAsync(int userId)
     {
         var bookings = await _db.GetPatientBookingsAsync(userId);
-        var result = bookings.Select(b => new BookingDto
-        {
-            AppointmentId    = b.AppointmentId,
-            TestName         = b.TestName,
-            Status           = ((AppointmentStatus)b.Status).ToString(),
-            ScheduledDate    = b.ScheduledDate,
-            Address          = b.Address,
-            ReportFileName   = b.ReportFileName,
-            ReportUploadedAt = b.ReportUploadedAt,
-            CreatedAt        = b.CreatedAt
-        }).ToList();
+        var result = _mapper.Map<List<BookingDto>>(bookings);
+       
 
         return result.ToSuccessResponse(_guid.NewGuid());
     }

@@ -5,7 +5,7 @@ using Shared.Infrastructure.Helpers;
 using Shared.Infrastructure.Models;
 using Shared.Infrastructure.Services;
 using Microsoft.AspNetCore.Http;
-
+using AutoMapper;
 namespace Module.Admin.Core.Services;
 
 public class AdminService : IAdminService
@@ -13,26 +13,20 @@ public class AdminService : IAdminService
     private readonly IAdminDBContext _db;
     private readonly IFileService _file;
     private readonly IGuidService _guid;
+    private readonly IMapper _mapper;
 
-    public AdminService(IAdminDBContext db, IFileService file, IGuidService guid)
+    public AdminService(IAdminDBContext db, IFileService file, IGuidService guid, IMapper mapper)
     {
         _db   = db;
         _file = file;
         _guid = guid;
+        _mapper = mapper;
     }
 
     public async Task<ApiResponse<StatsDto>> GetDashboardStatsAsync()
     {
         var stats = await _db.GetDashboardStatsAsync();
-        var result = new StatsDto
-        {
-            TotalPatients       = stats?.TotalPatients ?? 0,
-            TotalAppointments   = stats?.TotalAppointments ?? 0,
-            PendingAppointments = stats?.PendingAppointments ?? 0,
-            CompletedToday      = stats?.CompletedToday ?? 0,
-            ActiveRiders        = stats?.ActiveRiders ?? 0,
-            RevenueThisMonth    = stats?.RevenueThisMonth ?? 0
-        };
+        var result = _mapper.Map<StatsDto>(stats);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
@@ -44,23 +38,12 @@ public class AdminService : IAdminService
 
         var result = new AppointmentPagedDto
         {
-            TotalCount = totalCount,
-            Page       = page,
-            PerPage    = perPage,
-            Items      = rows.Select(r => new AppointmentAdminDto
-            {
-                AppointmentId  = r.AppointmentId,
-                PatientName    = r.PatientName,
-                Email          = r.Email,
-                TestName       = r.TestName,
-                Status         = ((AppointmentStatus)r.Status).ToString(),
-                ScheduledDate  = r.ScheduledDate,
-                Address        = r.Address,
-                RiderName      = r.RiderName,
-                RiderId        = r.RiderId,
-                ReportFileName = r.ReportFileName
-            }).ToList()
+            TotalCount = rows.FirstOrDefault()?.TotalCount ?? 0,
+            Page = page,
+            PerPage = perPage,
+            Items = _mapper.Map<List<AppointmentAdminDto>>(rows)
         };
+
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
@@ -121,29 +104,14 @@ public class AdminService : IAdminService
     public async Task<ApiResponse<List<PatientAdminDto>>> GetAllPatientsAsync()
     {
         var patients = await _db.GetAllPatientsAsync();
-        var result = patients.Select(p => new PatientAdminDto
-        {
-            UserId        = p.UserId,
-            Username      = p.Username,
-            Email         = p.Email,
-            TotalBookings = p.TotalBookings,
-            CreatedAt     = p.CreatedAt
-        }).ToList();
+        var result = _mapper.Map<List<PatientAdminDto>>(patients);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
     public async Task<ApiResponse<List<TestAdminDto>>> GetAllTestsAsync()
     {
         var tests = await _db.GetAllTestsAsync();
-        var result = tests.Select(t => new TestAdminDto
-        {
-            TestId      = t.TestId,
-            Name        = t.Name,
-            Description = t.Description,
-            Price       = t.Price,
-            Duration    = t.Duration,
-            IsActive    = t.IsActive
-        }).ToList();
+        var result = _mapper.Map<List<TestAdminDto>>(tests);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
@@ -171,16 +139,7 @@ public class AdminService : IAdminService
     public async Task<ApiResponse<List<RiderAdminDto>>> GetAllRidersAsync()
     {
         var riders = await _db.GetAllRidersAsync();
-        var result = riders.Select(r => new RiderAdminDto
-        {
-            RiderId             = r.RiderId,
-            Name                = r.Name,
-            Email               = r.Email,
-            Phone               = r.Phone,
-            Status              = ((RiderStatus)r.Status).ToString(),
-            TotalTasksCompleted = r.TotalTasksCompleted,
-            CreatedAt           = r.CreatedAt
-        }).ToList();
+        var result = _mapper.Map<List<RiderAdminDto>>(riders);
         return result.ToSuccessResponse(_guid.NewGuid());
     }
 
